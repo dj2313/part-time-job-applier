@@ -9,10 +9,15 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 CV_DIR = BASE_DIR / "cv"
+LOG_DIR = BASE_DIR / "logs"
 
 # Ensure directories exist
 DATA_DIR.mkdir(exist_ok=True)
 CV_DIR.mkdir(exist_ok=True)
+LOG_DIR.mkdir(exist_ok=True)
+
+# Application Quotas
+MAX_APPLICATIONS_PER_RUN = 10
 
 # Overpass API Configuration
 # Berlin Bounding Box

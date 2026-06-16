@@ -1,10 +1,10 @@
 import smtplib
-import logging
 from email.message import EmailMessage
+from tenacity import retry, stop_after_attempt, wait_exponential
 from config import GMAIL_ADDRESS, GMAIL_APP_PASSWORD
+from logger import logger
 
-logging.basicConfig(level=logging.INFO)
-
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def send_application_email(target_email, subject, message_body, cv_path=None):
     """
     Sends an email using Gmail SMTP.
@@ -43,4 +43,4 @@ def send_application_email(target_email, subject, message_body, cv_path=None):
         
     except Exception as e:
         logging.error(f"Failed to send email to {target_email}: {e}")
-        return False
+        raise

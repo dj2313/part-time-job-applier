@@ -1,15 +1,15 @@
 import requests
 import json
-import logging
 from config import BBOX, AMENITIES, OVERPASS_URL, PLACES_PATH
+from logger import logger
+from tenacity import retry, stop_after_attempt, wait_exponential
 
-logging.basicConfig(level=logging.INFO)
-
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def discover_places():
     """
     Query Overpass API for places matching the criteria.
     """
-    logging.info(f"Discovering places with amenities: {AMENITIES}")
+    logger.info(f"Discovering places with amenities: {AMENITIES}")
     
     # Construct Overpass QL query
     amenity_filter = "|".join(AMENITIES)
@@ -49,12 +49,12 @@ def discover_places():
         with open(PLACES_PATH, "w", encoding="utf-8") as f:
             json.dump(places, f, indent=4, ensure_ascii=False)
             
-        logging.info(f"Found {len(places)} places with websites. Saved to {PLACES_PATH}")
+        logger.info(f"Found {len(places)} places with websites. Saved to {PLACES_PATH}")
         return places
         
     except Exception as e:
-        logging.error(f"Failed to query Overpass API: {e}")
-        return []
+        logger.error(f"Failed to query Overpass API: {e}")
+        raise # Reraise for tenacity
 
 if __name__ == "__main__":
     discover_places()

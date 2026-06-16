@@ -1,47 +1,81 @@
-# Minijob Auto-Apply Agent
+# Minijob Auto-Apply Agent 🤖☕
 
-An autonomous agent that discovers cafes and restaurants in Berlin using OpenStreetMap, crawls their websites to find job/contact pages, uses Groq LLM to decide on the best application method, generates a personalized German cover letter, and automatically submits the application via web forms (Playwright) or email (Gmail SMTP). Sends status notifications via Telegram.
+This is a Python-based automation agent designed to help you find and apply for part-time jobs (minijobs) at cafes and restaurants in Berlin.
 
-## Setup Instructions
+## Features
 
-1. **Clone the repository** and navigate to the folder.
+- **Location Discovery**: Uses the Overpass API to find local amenities (cafes, restaurants, bars) in Berlin.
+- **Smart Crawling**: Uses Playwright to navigate websites, wait for Javascript to render, and extract text and forms.
+- **AI Decision Making**: Sends the website content to a large language model (LLM) via the Groq API (LLaMA3) to decide if it's better to send an email or fill out a web form.
+- **Automated Application**: 
+  - **Email**: Sends a localized German cover letter and attaches your CV via Gmail SMTP.
+  - **Form Fill**: Uses Playwright to automatically fill and submit job application forms.
+- **Telegram Notifications**: Sends you a real-time message via Telegram for every attempt, success, and failure.
+- **Rate Limiting & Deduplication**: Avoids applying to the same place twice and stops after a configurable quota.
 
-2. **Install requirements:**
-   ```bash
-   pip install -r requirements.txt
-   playwright install chromium
-   ```
+---
 
-3. **Configure Environment Variables:**
-   Copy `.env.example` to `.env` and fill in the values:
-   ```bash
-   cp .env.example .env
-   ```
-   - `GROQ_API_KEY`: Get from [Groq Console](https://console.groq.com/).
-   - `TELEGRAM_BOT_TOKEN` & `TELEGRAM_CHAT_ID`: Create a bot via BotFather on Telegram and get your chat ID.
-   - `GMAIL_ADDRESS` & `GMAIL_APP_PASSWORD`: Use a Google App Password, not your main account password.
+## 🚀 Setup & Installation
 
-4. **Update Profile & CV:**
-   - Edit `profile.json` with your real details, skills, and availability.
-   - Place your CV PDF file at `cv/CV.pdf` (or update the path in `profile.json`).
+### 1. Prerequisites
+- Python 3.11+
+- A [Groq API Key](https://console.groq.com/keys)
+- A Telegram Bot Token & Chat ID
+- A Gmail account with an [App Password](https://support.google.com/accounts/answer/185833?hl=en)
 
-5. **Run the script locally:**
-   ```bash
-   python main.py
-   ```
+### 2. Install Dependencies
+Clone the repository and install the required packages:
 
-## Automated Daily Run (GitHub Actions)
-The project includes a `.github/workflows/run.yml` file to run daily.
-If you host this on GitHub, make sure to add the following to your **Repository Secrets** (Settings > Secrets and variables > Actions):
-- `GROQ_API_KEY`
-- `TELEGRAM_BOT_TOKEN`
-- `TELEGRAM_CHAT_ID`
-- `GMAIL_ADDRESS`
-- `GMAIL_APP_PASSWORD`
+```bash
+pip install -r requirements.txt
+playwright install chromium
+```
 
-## Limitations & Warnings
-- **OSM Coverage:** Not all cafes/restaurants have a `website` tag on OpenStreetMap. The agent only processes those that do.
-- **Form Filling:** The AI does a "best-effort" to map form fields, but web forms are highly diverse. Some submissions might fail.
-- **Spam Prevention:** The script includes a 2-second delay between sites and skips already-processed sites to avoid spamming the same business.
+### 3. Environment Variables
+Create a `.env` file in the root directory (you can copy `.env.example`) and fill it in:
 
-*Disclaimer: Use this tool responsibly. Unsolicited automated messages can sometimes be marked as spam.*
+```env
+GROQ_API_KEY=your_groq_api_key_here
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+TELEGRAM_CHAT_ID=your_telegram_chat_id_here
+GMAIL_ADDRESS=your_email@gmail.com
+GMAIL_APP_PASSWORD=your_gmail_app_password_here
+```
+
+### 4. Setup Profile and CV
+- Edit `profile.json` to include your actual details (Name, Address, Languages, etc.)
+- Place your CV PDF inside the `cv/` directory and ensure the path matches in `profile.json`.
+
+---
+
+## 💻 Usage
+
+Run the agent locally:
+
+```bash
+python main.py
+```
+
+The script will:
+1. Discover places in Berlin.
+2. Visit their websites.
+3. Apply to up to 10 places (configurable in `config.py`).
+4. Log everything to `logs/agent.log`.
+5. Send you Telegram updates.
+
+---
+
+## ☁️ Running on GitHub Actions
+
+This project includes a `.github/workflows/daily_apply.yml` file, which runs the agent every day automatically.
+
+To enable this:
+1. Push this repository to GitHub.
+2. Go to **Settings > Secrets and variables > Actions**.
+3. Add the following Repository Secrets:
+   - `GROQ_API_KEY`
+   - `TELEGRAM_BOT_TOKEN`
+   - `TELEGRAM_CHAT_ID`
+   - `GMAIL_ADDRESS`
+   - `GMAIL_APP_PASSWORD`
+4. The agent will now run automatically at 09:00 AM UTC every day. You can also trigger it manually from the "Actions" tab.

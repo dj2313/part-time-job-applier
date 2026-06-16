@@ -1,18 +1,18 @@
 import os
 import json
-import logging
 from groq import Groq
+from tenacity import retry, stop_after_attempt, wait_exponential
 from config import GROQ_API_KEY
+from logger import logger
 
-logging.basicConfig(level=logging.INFO)
-
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def decide_application_method(url, content):
     """
     Uses Groq API to decide if we should use an email or a form.
     Returns a strict JSON format.
     """
     if not GROQ_API_KEY:
-        logging.error("GROQ_API_KEY is missing.")
+        logger.error("GROQ_API_KEY is missing.")
         return None
 
     client = Groq(api_key=GROQ_API_KEY)
@@ -23,7 +23,7 @@ def decide_application_method(url, content):
     
     Is there an application form, or just a contact email address?
     
-    Output strictly in JSON format matching this schema:
+    Output strictly in JSON format matching this schema. For fields and submit_hint, provide CSS selectors that use reliable attributes like name or id (e.g. input[name='email'], button[type='submit']).
     {{
         "method": "email" or "form",
         "email": "the email address found, or null",
@@ -64,5 +64,5 @@ def decide_application_method(url, content):
         return result_json
         
     except Exception as e:
-        logging.error(f"Groq API error during decision: {e}")
-        return None
+        logger.error(f"Groq API error during decision: {e}")
+        raise # Reraise for tenacity

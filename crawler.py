@@ -1,73 +1,63 @@
-import requests
-from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
-import logging
+from playwright.sync_api import sync_playwright
 from config import USER_AGENT
-
-logging.basicConfig(level=logging.INFO)
+from logger import logger
 
 def find_target_page(base_url):
     """
-    Crawls the base_url to find a job, career, or contact page.
+    Crawls the base_url to find a job, career, or contact page using Playwright.
     Returns the URL of the most relevant page and its text content.
     """
-    headers = {'User-Agent': USER_AGENT}
-    try:
-        response = requests.get(base_url, headers=headers, timeout=10)
-        response.raise_for_status()
-    except Exception as e:
-        logging.error(f"Failed to fetch {base_url}: {e}")
-        return None, None
-
-    soup = BeautifulSoup(response.text, 'html.parser')
-    
-    # Keywords to look for in links
     keywords = ['job', 'jobs', 'karriere', 'career', 'bewerbung', 'kontakt', 'contact']
-    
-    best_link = None
     domain = urlparse(base_url).netloc
     
-    for a_tag in soup.find_all('a', href=True):
-        href = a_tag['href']
-        text = a_tag.get_text().lower()
-        
-        # Resolve relative URLs
-        full_url = urljoin(base_url, href)
-        link_domain = urlparse(full_url).netloc
-        
-        if link_domain == domain:
-            for kw in keywords:
-                if kw in text or kw in href.lower():
-                    best_link = full_url
-                    # Prioritize job/career over contact
-                    if kw in ['job', 'jobs', 'karriere', 'career', 'bewerbung']:
-                        break
-            if best_link and any(kw in best_link.lower() for kw in ['job', 'karriere', 'bewerbung']):
-                break # Found a highly relevant link, stop searching
-                
-    target_url = best_link if best_link else base_url
-    logging.info(f"Target page for {base_url} is {target_url}")
-    
-    # Fetch content of the target page
     try:
-        if target_url != base_url:
-            target_response = requests.get(target_url, headers=headers, timeout=10)
-            target_response.raise_for_status()
-            target_soup = BeautifulSoup(target_response.text, 'html.parser')
-        else:
-            target_soup = soup
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            context = browser.new_context(user_agent=USER_AGENT)
+            page = context.new_page()
             
-        # Extract visible text and forms for the LLM to analyze
-        # We'll just pass a somewhat cleaned HTML or text to save tokens
-        for script in target_soup(["script", "style", "nav", "footer"]):
-            script.decompose()
-        content = target_soup.get_text(separator=' ', strip=True)
-        # Also grab forms html as string to help with field mapping
-        forms_html = "".join([str(f) for f in target_soup.find_all('form')])
-        
-        combined_content = f"TEXT CONTENT:\n{content[:5000]}\n\nFORMS HTML:\n{forms_html[:5000]}"
-        return target_url, combined_content
-        
+            logger.info(f"Crawling {base_url}...")
+            page.goto(base_url, wait_until="domcontentloaded", timeout=15000)
+            
+            best_link = None
+            
+            # Extract links
+            links = page.eval_on_selector_all("a[href]", "elements => elements.map(e => ({href: e.href, text: e.innerText}))")
+            
+            for link in links:
+                href = link.get("href", "")
+                text = (link.get("text") or "").lower()
+                
+                full_url = urljoin(base_url, href)
+                link_domain = urlparse(full_url).netloc
+                
+                if link_domain == domain:
+                    for kw in keywords:
+                        if kw in text or kw in href.lower():
+                            best_link = full_url
+                            if kw in ['job', 'jobs', 'karriere', 'career', 'bewerbung']:
+                                break
+                    if best_link and any(kw in best_link.lower() for kw in ['job', 'karriere', 'bewerbung']):
+                        break
+                        
+            target_url = best_link if best_link else base_url
+            logger.info(f"Target page for {base_url} is {target_url}")
+            
+            if target_url != base_url:
+                page.goto(target_url, wait_until="domcontentloaded", timeout=15000)
+                
+            # Remove scripts and styles
+            page.evaluate("document.querySelectorAll('script, style, nav, footer').forEach(e => e.remove())")
+            
+            content = page.evaluate("document.body.innerText")
+            forms_html = page.evaluate("Array.from(document.querySelectorAll('form')).map(f => f.outerHTML).join('\\n')")
+            
+            browser.close()
+            
+            combined_content = f"TEXT CONTENT:\n{content[:5000]}\n\nFORMS HTML:\n{forms_html[:5000]}"
+            return target_url, combined_content
+            
     except Exception as e:
-        logging.error(f"Failed to fetch target page {target_url}: {e}")
+        logger.error(f"Playwright error crawling {base_url}: {e}")
         return None, None
