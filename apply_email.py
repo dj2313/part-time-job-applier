@@ -1,3 +1,4 @@
+import logging
 import smtplib
 from email.message import EmailMessage
 from tenacity import retry, stop_after_attempt, wait_exponential
